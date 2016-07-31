@@ -1,0 +1,7 @@
+<%- include header %>
+<% if(locals.islogin) { %>
+<p>你好<%=locals.islogin %>，欢迎来到用户中心</p>
+<% } else{ %>
+<p>你尚未登录</p>
+<% } %>
+<%- include footer %>

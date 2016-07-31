@@ -1,0 +1,39 @@
+<%- include header %>
+<% if(locals.islogin) { %>
+<table border="1" class="hovertable" >
+<caption>我的股票</caption>
+<tr>
+	<th>股票ID</th><th>股票名称</th><th>价格</th><th>数量</th><th>卖出</th>
+</tr>
+	<% for(var i=0;locals.had[i];i++) {%>
+	<tr  onmouseover="this.style.backgroundColor='#ffff66';" onmouseout="this.style.backgroundColor='#d4e3e5';">
+	<td><%=locals.had[i].ID %></td>
+	<td><%=locals.had[i].name %></td>
+	<td><%=locals.had[i].price %></td>
+	<td><%=locals.had[i].num %></td>
+	<td>sold</td></tr>
+	<% } %>
+</table>
+
+<table border="1" class="hovertable">
+<caption>我的订单</caption>
+<tr>
+	<th>股票ID</th><th>股票名称</th><th>价格</th><th>交易类型</th><th>数量</th><th>撤单</th>
+</tr>
+
+	<% for(var i=0;locals.order[i];i++) {%>
+	<tr onmouseover="this.style.backgroundColor='#ffff66';" onmouseout="this.style.backgroundColor='#d4e3e5';">
+	<td><%=locals.order[i].ID %></td>
+	<td><%=locals.order[i].name %></td>
+	<td><%=locals.order[i].price %></td>
+	<td><%=locals.order[i].type %></td>
+	<td><%=locals.order[i].num %></td>
+	<td>cancel</td></tr>
+	<% } %>
+
+</table>
+
+<% } else{ %>
+<p>你尚未登录</p>
+<% } %>
+<%- include footer %>

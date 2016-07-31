@@ -1,0 +1,19 @@
+<%- include header %>
+<div class="container">
+    <form class=" col-sm-offset-4 col-sm-4 form-horizontal" role="form" method="post">
+	<p><label for="market">交易市场:</label>
+	<select id="market">
+  		<option value ="SH">上海A股</option>
+  		<option value ="SZ">深圳A股</option>
+	</select></p>
+    <p><label for="ShareID">股票ID:</label>
+       <input type="text" id="ShareID" name="ShareID" placeholder="股票ID(不填以查看股指)" required>
+	<select id="time">
+  		<option value ="day">每日走势</option>
+  		<option value ="min">今日走势</option>
+		<option value ="sec">实时情况</option>
+	</select></p>
+    <p><button style="float:right;width:50px;height:30px" type="submit" class="btn btn-primary">查询 </button></p>
+    </form>
+</div>
+<%- include footer %>

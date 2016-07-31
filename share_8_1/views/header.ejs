@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Share System</title>
+<link rel="stylesheet" href="/stylesheets/style.css">
+</head>
+<body>
+<header>
+<h1><%= title %></h1>
+</header>
+<nav>
+<span><a title="主页" href="/">主页</a></span>
+<span><a title="查询" href="/search">查询</a></span>
+<% if(!locals.islogin){%>
+<span><a title="登录" href="/login">登录</a></span>
+<span><a title="注册" href="/reg">注册</a></span>
+<% } else{%>
+<span><a title="个人主页" href="/home">个人主页</a></span>
+<span><a title="我的股票" href="/own">我的股票</a></span>
+<span><a title="买入" href="/buy">买入</a></span>
+<span><a title="市价委托" href="/appoint">市价委托</a></span>
+<span><a title="退出" href="/logout">退出</a></span>
+<% } %>
+</nav>
+<article>
