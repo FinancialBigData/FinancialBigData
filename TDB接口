@@ -1,0 +1,685 @@
+
+// TDBEasyDemo.cpp : 定义控制台应用程序的入口点。
+//
+
+#include <conio.h>
+#include "TDBAPI.h"
+#include "iostream"
+#include <string>
+#include <algorithm>
+#include <assert.h>
+#include "Windows.h"
+#include "vector"
+#include <fstream>
+#include <sstream>
+#include <time.h>
+
+using namespace std;
+
+
+#ifdef NDEBUG
+
+#define AssertEx(expr) expr;
+
+#else
+#define AssertEx(expr) {int n = (int)(expr); assert(n);} 
+#endif
+
+#define ELEMENT_COUNT(arr) (sizeof(arr)/sizeof(*arr))
+
+void GetKData(THANDLE hTdb, char* szCode, char* szMarket, int nBeginDate, int nEndDate, int nCycle, int nUserDef, int nCQFlag, int nAutoComplete);
+void GetTickData(THANDLE hTdb, std::string& szCode, char* szMarket, int nDate, int nBeginTime, int nEndTime);//带买卖盘的tick
+void GetTransaction(THANDLE hTdb, char* szCode, char* szMarket, int nDate); //逐笔成交
+void GetOrder(THANDLE hTdb, char* szCode, char* szMarket, int nDate);//逐笔委托
+void GetOrderQueue(THANDLE hTdb, char* szCode, char* szMarket, int nDate);//委托队列
+void UseEZFFormula(THANDLE hTdb);
+void GetCodeTable(THANDLE hTdb, char* szMarket);
+bool CalOneFluctuationRatio(THANDLE hTdb, const string strCode, int startDate, int endDate, double& volatility);//计算某只股票在一段时间内的波动率
+int test(THANDLE hTdb);
+
+std::string int2str(int n)
+{
+	char szBuf[32];
+	_snprintf(szBuf, sizeof(szBuf) / sizeof(szBuf[0]), "%d", n);
+	return std::string(szBuf);
+}
+
+std::string array2str(const int* arr, int len)
+{
+	std::string str;
+	for (int i = 0; i<len; i++)
+	{
+		if (i == len - 1)
+		{
+			str += int2str(arr[i]) + " ";
+		}
+		else
+		{
+			str += int2str(arr[i]) + ",";
+		}
+	}
+	return str;
+}
+
+static int ErrNum = 0;
+static char ErrCode[100][10] = { 0 };
+int main()
+{
+	printf("----------------------------- 正在登录... ---------------------------\n");
+	printf("                                                                     \n");
+	printf("                                                                     \n");
+	THANDLE hTdb = NULL;
+	char* svr_ip = new char[20];
+	int svr_port = 0;
+	char* username = new char[20];
+	char* password = new char[20];
+
+	//设置服务器信息
+	OPEN_SETTINGS settings = { 0 };
+	strcpy(settings.szIP, "*******");
+	sprintf(settings.szPort, "%d", ****;
+	strcpy(settings.szUser, "********");
+	strcpy(settings.szPassword, "*******");
+	settings.nRetryCount = 2;
+	settings.nRetryGap = 1;
+	settings.nTimeOutVal = 10;
+	/*
+	TDB_PROXY_SETTING proxy_settings;
+	proxy_settings.nProxyType = TDB_PROXY_HTTP11;
+	strcpy(proxy_settings.szProxyHostIp,   "*****");
+	sprintf(proxy_settings.szProxyPort, "%d",****);
+	strcpy(proxy_settings.szProxyUser,   "*****");
+	strcpy(proxy_settings.szProxyPwd,   "******");
+
+	*/
+	TDBDefine_ResLogin LoginRes = { 0 };
+
+	//TDB_Open_Proxy
+	//hTdb = TDB_OpenProxy(&settings,&proxy_settings,&LoginRes);
+
+	//TDB_Open
+	hTdb = TDB_Open(&settings, &LoginRes);
+	//TDB_Close(hTdb);
+	//hTdb = NULL;
+	//hTdb = TDB_Open(&settings, &LoginRes);
+
+	int nRet = TDB_SUCCESS;
+	//用于网络重新连接用
+	/*while (hTdb && nRet != TDB_NETWORK_ERROR && nRet != TDB_NETWORK_TIMEOUT)
+	{
+	nRet = test(hTdb);
+	}
+	TDB_Close(hTdb);
+	hTdb = NULL;
+	/*
+	while(1)
+	{
+	Sleep(3000);
+	hTdb = TDB_Open(&settings, &LoginRes);
+
+	if (hTdb)
+	{
+	break;
+	}
+	}
+	*/
+
+	if (!hTdb)
+	{
+		printf("连接失败！");
+		getchar();
+		return 0;
+	}
+	printf("------------------------------- 登录结束----------------------------\n");
+	printf("                                                                     \n");
+	printf("                                                                     \n");
+	/***************************** 登录信息end ********************************/
+
+	/**************************** 请求数据start ********************************/
+	/*
+	//TDB_GetCodeInfo代码表信息
+	{
+	const TDBDefine_Code* pCode = TDB_GetCodeInfo(hTdb, "000001.sz", "SZ-2-0");
+	printf("-------------收到代码信息----------------------------\n");
+	printf("交易所代码 chWindCode:%s \n", pCode->chCode);
+	printf("市场代码 chWindCode:%s \n", pCode->chMarket);
+	printf("证券中文名称 chWindCode:%s \n", pCode->chCNName);
+	printf("证券英文名称 chWindCode:%s \n", pCode->chENName);
+	printf("证券类型 chWindCode:%d \n", pCode->nType);
+	}
+
+	//TDB_GetCodeTable
+	{
+	GetCodeTable(hTdb, "SZ-2-0");
+	}
+
+	//---//
+	{
+	GetKData(hTdb, "000001.sz", "SZ-2-0", 20150910, 20150915, CYC_MINUTE, 0, 0, 0);
+	GetKData(hTdb, "000001.sz", "SZ-2-0", 20150418, 20160418, CYC_DAY, 0, 0, 0);
+	GetKData(hTdb, "000001.sz", "SZ-2-0", 20150910, 20150915, CYC_SECOND, 0, 0, 1);
+	GetTickData(hTdb, "000001.sz", "SZ-2-0", 20150910);//带买卖盘的tick
+	GetOrder(hTdb, "000001.sz", "SZ-2-0", 20150910);//带买卖盘的tick 深圳特有
+	GetOrderQueue(hTdb, "000001.sz", "SZ-2-0", 20150910);//带买卖盘的tick 买一和卖一上的前50笔
+	UseEZFFormula(hTdb);
+	}
+
+	printf("输入任意键结束程序");
+	getchar();
+	int nRet2 = -1;
+	if (hTdb)
+	nRet2 = TDB_Close(hTdb);
+
+	return 0;
+	*/
+	/*
+	//定义文件输出流
+	ofstream outfile;
+
+	//打开要输出的文件
+	outfile.open("000001_tick_20100418_20160418.csv", ios::out | ios::trunc);
+	outfile << "Date" << "," << "Volume" << "," << "Turover" << "," << "High" <<","<<"Low"<<","<<"Price"<<","<<"Open"<<","<<"PreClose"<< endl;
+	outfile <<
+	//outfile << "姓名" << "," << "年龄" << "," << "班级" << "," << "班主任" << endl;
+	//outfile << "张三" << "," << "22" << "," << "1" << "," << "JIM" << endl;
+	//outfile << "李四" << "," << "23" << "," << "3" << "," << "TOM" << endl;
+	outfile.close();
+	*/
+	ifstream ifile("D:\\stocks\\sh.txt");
+	string stockCode;
+	//for (int ii = 0; ii < 10; ii++,n++){
+		
+		while (getline(ifile, stockCode)){
+			string strCode = stockCode + ".SH";
+			char c[20];
+			strcpy(c, strCode.c_str());
+			cout << "股票代码为：" << strCode << endl;
+			//system("pause");
+			printf("-----------------------------开始请求Tick数据---------------------------\n");
+
+
+			GetTickData(hTdb, strCode, "SH-2-0", 20160722, 93000000, 150000000);//带买卖盘的tick
+			GetKData(hTdb, c, "Sh-2-0", 20160629, 20160729, CYC_MINUTE, 0, 0, 0);
+			//exit(0);
+			//system("pause");
+			//ifstream outfile;
+		}
+	}
+//}
+
+
+int test(THANDLE hTdb)
+{
+	//while (1)
+	//{
+	//请求K线
+	TDBDefine_ReqKLine* req = new TDBDefine_ReqKLine;
+	strncpy(req->chCode, "000001.SZ", ELEMENT_COUNT(req->chCode));
+	strncpy(req->chMarketKey, "SZ-2-0", ELEMENT_COUNT(req->chMarketKey));
+
+	req->nCQFlag = (REFILLFLAG)0;//除权标志，由用户定义
+	req->nBeginDate = 20151201;//开始日期
+	req->nEndDate = 20151205;//结束日期
+	req->nBeginTime = 0;//开始时间
+	req->nEndTime = 0;//结束时间
+
+	//req->nCycType = (CYCTYPE)CYC_DAY;
+	req->nCycType = (CYCTYPE)CYC_SECOND;
+	req->nCycDef = 0;
+
+	//返回结构体指针
+	TDBDefine_KLine* kLine = NULL;
+	//返回数
+	int pCount;
+	//API请求K线
+	int nRet = TDB_GetKLine(hTdb, req, &kLine, &pCount);
+	//delete req;
+	//cout << "133"<<endl;
+	req = NULL;
+	if (nRet == TDB_NETWORK_TIMEOUT || nRet == TDB_NETWORK_ERROR)
+	{
+		return nRet;
+	}
+	return nRet;
+}
+//TDB_Free();
+//	return 0;
+//}
+
+
+//请求代码表
+void GetCodeTable(THANDLE hTdb, char* szMarket)
+{
+	TDBDefine_Code* pCodetable = NULL;
+	int pCount;
+	bool outPutTable = false;
+	int ret = TDB_GetCodeTable(hTdb, szMarket, &pCodetable, &pCount);
+
+	if (ret == TDB_NO_DATA)
+	{
+		printf("无代码表！");
+		return;
+	}
+	printf("---------------------------Code Table--------------------\n");
+	printf("收到代码表项数：%d，\n\n", pCount);
+	//输出
+	if (outPutTable)
+	{
+		for (int i = 0; i<pCount; i++)
+		{
+			printf("交易所代码 chWindCode:%s \n", pCodetable[i].chCode);
+			printf("市场代码 chWindCode:%s \n", pCodetable[i].chMarket);
+			printf("证券中文名称 chWindCode:%s \n", pCodetable[i].chCNName);
+			printf("证券英文名称 chWindCode:%s \n", pCodetable[i].chENName);
+			printf("证券类型 chWindCode:%d \n", pCodetable[i].nType);
+			printf("----------------------------------------\n");
+		}
+	}
+	else
+	{
+		//print top 10
+		int i = pCount>10 ? 10 : pCount;
+		for (; i > 0; i--)
+		{
+			printf("交易所代码 chWindCode:%s \n", pCodetable[i - 1].chCode);
+			printf("市场代码 chWindCode:%s \n", pCodetable[i - 1].chMarket);
+			printf("证券中文名称 chWindCode:%s \n", pCodetable[i - 1].chCNName);
+			printf("证券英文名称 chWindCode:%s \n", pCodetable[i - 1].chENName);
+			printf("证券类型 chWindCode:%d \n", pCodetable[i - 1].nType);
+			printf("----------------------------------------\n");
+		}
+	}
+	//释放
+	TDB_Free(pCodetable);
+}
+
+void GetKData(THANDLE hTdb, char* szCode, char* szMarket, int nBeginDate, int nEndDate, int nCycle, int nUserDef, int nCQFlag, int nAutoComplete)
+{
+	//请求K线
+	TDBDefine_ReqKLine* req = new TDBDefine_ReqKLine;
+	strncpy(req->chCode, szCode, ELEMENT_COUNT(req->chCode));
+	strncpy(req->chMarketKey, szMarket, ELEMENT_COUNT(req->chMarketKey));
+
+	req->nCQFlag = (REFILLFLAG)nCQFlag;//除权标志，由用户定义
+	req->nBeginDate = nBeginDate;//开始日期
+	req->nEndDate = nEndDate;//结束日期
+	req->nBeginTime = 0;//开始时间
+	req->nEndTime = 0;//结束时间
+
+	req->nCycType = (CYCTYPE)nCycle;
+	req->nCycDef = 0;
+
+	//返回结构体指针
+	TDBDefine_KLine* kLine = NULL;
+	//返回数
+	int pCount;
+	//API请求K线
+	TDB_GetKLine(hTdb, req, &kLine, &pCount);
+	delete req;
+	req = NULL;
+
+	//printf("---------------------------K Data--------------------\n");
+	//printf("数据条数：%d,打印 1/100 条\n\n", pCount);
+	ofstream outfile;
+	ifstream ifile("D:\\stocks\\sh.txt");
+	string stockCode;
+	if (!ifile.eof()){
+		string strCode = szCode;
+		outfile.open("D:\\stocks\\kline\\mlinem\\5\\" + strCode + ".csv", ios::out | ios::app);
+		outfile << "chWindCode"<< "," << "chCode" << "," << "chCode" << "," << "nTime" << "," << "nOpen" << "," << "nHigh" << "," << "nLow" << "," << "nClose" << "," <<"iVolume" << "," << "iTurover" << "," << "nMatchItems" << "," << "nInterest" << endl;
+		for (int i = 0; i < pCount;)
+		{
+			//printf("WindCode:%s\n Code:%s\n Date:%d\n Time:%d\n Open:%d\n High:%d\n Low:%d\n Close:%d\n Volume:%I64d\n Turover:%I64d\n MatchItem:%d\n Interest:%d\n",
+				//kLine[i].chWindCode, kLine[i].chCode, kLine[i].nDate, kLine[i].nTime, kLine[i].nOpen, kLine[i].nHigh, kLine[i].nLow, kLine[i].nClose,
+				//kLine[i].iVolume, kLine[i].iTurover, kLine[i].nMatchItems, kLine[i].nInterest);
+			outfile << kLine[i].chWindCode << "," << kLine[i].chCode << "," << kLine[i].nDate << "," << kLine[i].nTime << "," << ((kLine[i].nOpen / 10000.0) - 0.00005) << "," << ((kLine[i].nHigh / 10000.0) - 0.00005) << "," << ((kLine[i].nLow / 10000.0) - 0.00005) << "," << ((kLine[i].nClose / 10000.0) - 0.00005) << "," << kLine[i].iVolume << "," << kLine[i].iTurover << "," << kLine[i].nMatchItems << "," << kLine[i].nInterest << endl;
+
+
+			i += 15;
+		}
+	}
+	outfile.close();
+	//释放
+	TDB_Free(kLine);
+}
+
+//tick
+void GetTickData(THANDLE hTdb, std::string& szCode, char* szMarket, int nDate, int nBeginTime, int nEndTime)
+{
+	//请求信息
+	TDBDefine_ReqTick req = { 0 };
+	//注意：在本函数内，szCode本是char*类型的，现在要将其转换为string类型,直接在函数体里面写成std::string&,然后
+	//在下面这句话中注意再使用c_str()函数转换
+	strncpy(req.chCode, szCode.c_str(), sizeof(req.chCode)); //代码写成你想获取的股票代码
+	strncpy(req.chMarketKey, szMarket, sizeof(req.chMarketKey));
+	req.nDate = nDate;
+	req.nBeginTime = 93000000;
+	req.nEndTime = 150000000;
+
+	TDBDefine_Tick *pTick = NULL;
+	int pCount;
+	int ret = TDB_GetTick(hTdb, &req, &pTick, &pCount);
+
+
+	//printf("共收到 %d 条Tick数据， 打印 1/100 条：\n", pCount);
+	
+	ofstream outfile;
+	ifstream ifile("D:\\stocks\\sz.txt");
+	string stockCode;
+	std::stringstream ss;
+	std::string str;
+	ss << nDate;
+	ss >> str;
+		if (!ifile.eof()){
+			string strCode = szCode;
+			outfile.open("D:\\stocks\\csv\\160722sz\\" + szCode+str+ ".csv", ios::out | ios::app);
+			outfile << "chWindCode" << "," << "nDate" << "," << "nTime" << "," << "nPrice" << "," << "iVolume" << "," << "iTurover" << ","
+				<< "nMatchItems" << "," << "nInterest" << "," << "chTradeFlag" << "," << "chBSFlag" << "," << "iAccVolume" << ","
+				<< "iAccTurover" << "," << "nHigh" << "," << "nLow" << "," << "nOpen" << "," << "nPreClose" << endl;
+
+			for (int i = 0; i < pCount; i++)
+			{
+				TDBDefine_Tick& pTickCopy = pTick[i];
+				//TDBDefine_Tick& pTickCopy = *(pTick + i);
+#if 0
+				printf("万得代码 chWindCode:%s \n", pTickCopy.chWindCode);
+				printf("日期 nDate:%d \n", pTickCopy.nDate);
+				printf("时间 nTime:%d \n", pTickCopy.nTime);
+
+				printf("成交价 nPrice:%d \n", pTickCopy.nPrice);
+				printf("成交量 iVolume:%I64d \n", pTickCopy.iVolume);
+				printf("成交额(元) iTurover:%I64d \n", pTickCopy.iTurover);
+				printf("成交笔数 nMatchItems:%d \n", pTickCopy.nMatchItems);
+				printf(" nInterest:%d \n", pTickCopy.nInterest);
+
+				printf("成交标志: chTradeFlag:%c \n", pTickCopy.chTradeFlag);
+				printf("BS标志: chBSFlag:%c \n", pTickCopy.chBSFlag);
+				printf("当日成交量: iAccVolume:%I64d \n", pTickCopy.iAccVolume);
+				printf("当日成交额: iAccTurover:%I64d \n", pTickCopy.iAccTurover);
+
+				printf("最高 nHigh:%d \n", pTickCopy.nHigh);
+				printf("最低 nLow:%d \n", pTickCopy.nLow);
+				printf("开盘 nOpen:%d \n", pTickCopy.nOpen);
+				printf("前收盘 nPreClose:%d \n", pTickCopy.nPreClose);
+
+				//买卖盘字段
+				std::string strOut = array2str(pTickCopy.nAskPrice, ELEMENT_COUNT(pTickCopy.nAskPrice));
+				printf("叫卖价 nAskPrice:%s \n", strOut.c_str());
+				strOut = array2str((const int*)pTickCopy.nAskVolume, ELEMENT_COUNT(pTickCopy.nAskVolume));
+				printf("叫卖量 nAskVolume:%s \n", strOut.c_str());
+				strOut = array2str(pTickCopy.nBidPrice, ELEMENT_COUNT(pTickCopy.nBidPrice));
+				printf("叫买价 nBidPrice:%s \n", strOut.c_str());
+				strOut = array2str((const int*)pTickCopy.nBidVolume, ELEMENT_COUNT(pTickCopy.nBidVolume));
+				printf("叫买量 nBidVolume:%s \n", strOut.c_str());
+				printf("加权平均叫卖价 nAskAvPrice:%d \n", pTickCopy.nAskAvPrice);
+				printf("加权平均叫买价 nBidAvPrice:%d \n", pTickCopy.nBidAvPrice);
+				printf("叫卖总量 iTotalAskVolume:%I64d \n", pTickCopy.iTotalAskVolume);
+				printf("叫买总量 iTotalBidVolume:%I64d \n", pTickCopy.iTotalBidVolume);
+				//system("pause");
+#endif
+				//for (int i = 0; i <= pCount; i++){
+				outfile << strCode << "," << pTickCopy.nDate << "," << pTickCopy.nTime << ","
+					<< ((pTickCopy.nPrice / 10000.0) - 0.00005) << "," << pTickCopy.iVolume << "," << pTickCopy.iTurover
+					<< "," << pTickCopy.nMatchItems << "," << pTickCopy.nInterest << "," << pTickCopy.chTradeFlag
+					<< "," << pTickCopy.chBSFlag << "," << pTickCopy.iAccVolume << "," << pTickCopy.iAccTurover
+					<< "," << ((pTickCopy.nHigh / 10000.0) - 0.00005) << "," << ((pTickCopy.nLow / 10000.0) - 0.00005) << ","
+					<< ((pTickCopy.nOpen / 10000.0) - 0.00005) << "," << ((pTickCopy.nPreClose / 10000.0) - 0.00005) << endl;
+				//}
+				//outfile.close();
+
+#if 0
+				//期货字段
+				printf("结算价 nSettle:%d \n", pTickCopy.nSettle);
+				printf("持仓量 nPosition:%d \n", pTickCopy.nPosition);
+				printf("虚实度 nCurDelta:%d \n", pTickCopy.nCurDelta);
+				printf("昨结算 nPreSettle:%d \n", pTickCopy.nPreSettle);
+				printf("昨持仓 nPrePosition:%d \n", pTickCopy.nPrePosition);
+
+				//指数
+				printf("不加权指数 nIndex:%d \n", pTickCopy.nIndex);
+				printf("品种总数 nStocks:%d \n", pTickCopy.nStocks);
+				printf("上涨品种数 nUps:%d \n", pTickCopy.nUps);
+				printf("下跌品种数 nDowns:%d \n", pTickCopy.nDowns);
+				printf("持平品种数 nHoldLines:%d \n", pTickCopy.nHoldLines);
+#endif
+				
+				//i += 1000;
+			}
+		}
+		outfile.close();
+	
+	//释放
+	TDB_Free(pTick);
+	//system("pause");
+}
+
+//逐笔成交
+void GetTransaction(THANDLE hTdb, char* szCode, char* szMarketKey, int nDate)
+{
+	//请求
+	TDBDefine_ReqTransaction req = { 0 };
+	strncpy(req.chCode, szCode, sizeof(req.chCode)); //代码写成你想获取的股票代码
+	strncpy(req.chMarketKey, szMarketKey, sizeof(req.chMarketKey));
+	req.nDate = nDate;
+	req.nBeginTime = 0;
+	req.nEndTime = 0;
+
+	TDBDefine_Transaction *pTransaction = NULL;
+	int pCount;
+	int ret = TDB_GetTransaction(hTdb, &req, &pTransaction, &pCount);
+
+	if (pTransaction && pCount && pTransaction[pCount - 1].nTradeVolume > 100000)
+	{
+		printf("错误code:%s\n", req.chCode);
+		strncpy(ErrCode[ErrNum++], req.chCode, sizeof(req.chCode));
+	}
+
+#if 0
+	printf("---------------------------------------Transaction Data------------------------------------------\n");
+	printf("收到 %d 条逐笔成交消息，打印 1/10000 条\n", pCount);
+
+	for (int i = 0; i<pCount;)
+	{
+		const TDBDefine_Transaction& trans = pTransaction[i];
+		printf("成交时间(Date): %d \n", trans.nDate);
+		printf("成交时间: %d \n", trans.nTime);
+		printf("成交代码: %c \n", trans.chFunctionCode);
+		printf("委托类别: %c \n", trans.chOrderKind);
+		printf("BS标志: %c \n", trans.chBSFlag);
+		printf("成交价格: %d \n", trans.nTradePrice);
+		printf("成交数量: %d \n", trans.nTradeVolume);
+		printf("叫卖序号: %d \n", trans.nAskOrder);
+		printf("叫买序号: %d \n", trans.nBidOrder);
+		printf("------------------------------------------------------\n");
+#if 0
+		printf("成交编号: %d \n", trans.nBidOrder);
+#endif
+		i += 10000;
+	}
+#endif
+	//释放
+	TDB_Free(pTransaction);
+}
+
+//逐笔委托
+void GetOrder(THANDLE hTdb, char* szCode, char* szMarketKey, int nDate)
+{
+	//请求
+	TDBDefine_ReqOrder req = { 0 };
+	strncpy(req.chCode, szCode, sizeof(req.chCode)); //代码写成你想获取的股票代码
+	strncpy(req.chMarketKey, szMarketKey, sizeof(req.chMarketKey));
+	req.nDate = nDate;
+	req.nBeginTime = 0;
+	req.nEndTime = 0;
+
+	TDBDefine_Order *pOrder = NULL;
+	int pCount;
+	int ret = TDB_GetOrder(hTdb, &req, &pOrder, &pCount);
+	//printf("---------------------Order Data----------------------\n");
+	//printf("收到 %d 条逐笔委托消息，打印 1/10000 条\n", pCount);
+	//for (int i=0; i<pCount; )
+	//{
+	//const TDBDefine_Order& order = pOrder[i];
+	//printf("订单时间(Date): %d \n", order.nDate);
+	//printf("委托时间(HHMMSSmmm): %d \n", order.nTime);
+	//printf("委托编号: %d \n", order.nOrder);
+	//printf("委托类别: %c \n", order.chOrderKind);
+	//printf("委托代码: %c \n", order.chFunctionCode);
+	//printf("委托价格: %d \n", order.nOrderPrice);
+	//printf("委托数量: %d \n", order.nOrderVolume);
+	//printf("-------------------------------\n");
+
+	//i += 10000;
+	//}
+	//释放
+	TDB_Free(pOrder);
+}
+
+//委托队列
+void GetOrderQueue(THANDLE hTdb, char* szCode, char* szMarketKey, int nDate)
+{
+	//请求
+	TDBDefine_ReqOrderQueue req = { 0 };
+	strncpy(req.chCode, szCode, sizeof(req.chCode)); //代码写成你想获取的股票代码
+	strncpy(req.chMarketKey, szMarketKey, sizeof(req.chMarketKey));
+	req.nDate = nDate;
+	req.nBeginTime = 0;
+	req.nEndTime = 0;
+
+	TDBDefine_OrderQueue *pOrderQueue = NULL;
+	int pCount;
+	TDB_GetOrderQueue(hTdb, &req, &pOrderQueue, &pCount);
+
+	printf("-------------------OrderQueue Data-------------\n");
+	printf("收到 %d 条委托队列消息，打印 1/1000 条\n", pCount);
+
+	for (int i = 0; i<pCount; i++)
+	{
+		const TDBDefine_OrderQueue& que = pOrderQueue[i];
+		printf("订单时间(Date): %d \n", que.nDate);
+		printf("订单时间(HHMMSS): %d \n", que.nTime);
+		printf("买卖方向('B':Bid 'A':Ask): %c \n", que.nSide);
+		printf("成交价格: %d \n", que.nPrice);
+		printf("订单数量: %d \n", que.nOrderItems);
+		printf("明细个数: %d \n", que.nABItems);
+		printf("订单明细: %s \n", array2str(que.nABVolume, que.nABItems).c_str());
+		printf("-------------------------------\n");
+		i += 1000;
+	}
+	//释放
+	TDB_Free(pOrderQueue);
+}
+
+//指标公式
+void UseEZFFormula(THANDLE hTdb)
+{
+	//公式的编写，请参考<<TRANSEND-TS-M0001 易编公式函数表V1(2).0-20110822.pdf>>;
+	std::string strName = "KDJ";
+	std::string strContent = "INPUT:N(9), M1(3,1,100,2), M2(3);"
+		"RSV:=(CLOSE-LLV(LOW,N))/(HHV(HIGH,N)-LLV(LOW,N))*100;"
+		"K:SMA(RSV,M1,1);"
+		"D:SMA(K,M2,1);"
+		"J:3*K-2*D;";
+
+	//添加公式到服务器并编译，若不过，会有错误返回
+	TDBDefine_AddFormulaRes* addRes = new TDBDefine_AddFormulaRes;
+	int nErr = TDB_AddFormula(hTdb, strName.c_str(), strContent.c_str(), addRes);
+	printf("Add Formula Result:%s", addRes->chInfo);
+
+	//查询服务器上的公式，能看到我们刚才上传的"KDJ"
+	TDBDefine_FormulaItem* pEZFItem = NULL;
+	int nItems = 0;
+	//名字为空表示查询服务器上所有的公式
+	nErr = TDB_GetFormula(hTdb, NULL, &pEZFItem, &nItems);
+
+	for (int i = 0; i<nItems; i++)
+	{
+		std::string strNameInner(pEZFItem[i].chFormulaName, 0, sizeof(pEZFItem[i].chFormulaName));
+		std::string strParam(pEZFItem[i].chParam, 0, sizeof(pEZFItem[i].chParam));
+		printf("公式名称：%s, 参数:%s \n", strNameInner.c_str(), strParam.c_str());
+	}
+
+	struct EZFCycDefine
+	{
+		char chName[8];
+		int  nCyc;
+		int  nCyc1;
+	}
+	EZFCyc[5] = {
+		{ "日线", 2, 0 },
+		{ "30分", 0, 30 },
+		{ "5分钟", 0, 5 },
+		{ "1分钟", 0, 1 },
+		{ "15秒", 11, 15 } };
+
+	//获取公式的计算结果
+	TDBDefine_ReqCalcFormula reqCalc = { 0 };
+	strncpy(reqCalc.chFormulaName, "KDJ", sizeof(reqCalc.chFormulaName));
+	strncpy(reqCalc.chParam, "N=9,M1=3,M2=3", sizeof(reqCalc.chParam));
+	strncpy(reqCalc.chCode, "000001.SZ", sizeof(reqCalc.chCode));
+	strncpy(reqCalc.chMarketKey, "SZ-2-0", sizeof(reqCalc.chMarketKey));
+	reqCalc.nCycType = (CYCTYPE)(EZFCyc[0].nCyc); //0表示日线
+	reqCalc.nCycDef = EZFCyc[0].nCyc1;
+	reqCalc.nCQFlag = (REFILLFLAG)0;		  //除权标志
+	reqCalc.nCalcMaxItems = 4000; //计算的最大数据量
+	reqCalc.nResultMaxItems = 100;	//传送的结果的最大数据量
+
+	TDBDefine_CalcFormulaRes* pResult = new TDBDefine_CalcFormulaRes;
+	nErr = TDB_CalcFormula(hTdb, &reqCalc, pResult);
+	//判断错误代码
+
+	printf("计算结果有: %d 条:\n", pResult->nRecordCount);
+	char szLineBuf[1024] = { 0 };
+	//输出字段名
+	for (int j = 0; j<pResult->nFieldCount; j++)
+	{
+		std::cout << pResult->chFieldName[j] << "  ";
+	}
+	std::cout << endl << endl;
+	//输出数据
+	for (int i = 0; i<pResult->nRecordCount; i++)
+	{
+		for (int j = 0; j<pResult->nFieldCount; j++)
+		{
+			std::cout << (pResult->dataFileds)[j][i] << "  ";
+		}
+		std::cout << endl;
+	}
+
+	//删除之前上传的公式指标
+	TDBDefine_DelFormulaRes pDel = { 0 };
+	nErr = TDB_DeleteFormula(hTdb, "KDJ", &pDel);
+	printf("删除指标信息:%s", pDel.chInfo);
+	//释放内存
+	delete pEZFItem;
+	TDB_ReleaseCalcFormula(pResult);
+}
+bool CalOneFluctuationRatio(THANDLE hTdb, const string strCode, int startDate, int endDate, double& volatility){
+	//TDBDefine_ReqKLine reqK = { "", REFILL_NONE, 0, 0, CYC_DAY, 1, 1, startTime, endTime, 0, 0 }; //获取K线数据
+	TDBDefine_ReqKLine reqK = { "", REFILL_NONE, 0, 0, CYC_DAY, 1, 1, startDate, endDate, 0, 0 };
+	strncpy(reqK.chCode, strCode.c_str(), sizeof(reqK.chCode));
+	TDBDefine_KLine* pKLine = NULL;
+	int nCount = 0;
+	int nRet = TDB_GetKLine(hTdb, &reqK, &pKLine, &nCount);
+	if (nCount == 0)
+		return false;
+	vector <double> tmp(nCount, 0.0);
+	//Print("---------------------收到%d项K线，错误码:%d -----------------\n", nCount, nRet);
+	double sum = 0.0;
+	for (int i = 0; i < nCount; i++)
+	{
+		TDBDefine_KLine& tdbK = *(pKLine + i);
+		tmp[i] = log((double)tdbK.nClose / tdbK.nOpen);
+		sum += tmp[i];
+	}
+	double average = (double)sum / nCount;
+	sum = 0.0;
+	for (int i = 0; i < nCount; i++)
+	{
+		sum += pow(tmp[i] - average, 2);
+	}
+	double FluctuationRatio = sqrt(sum / nCount) * sqrt(double(nCount));
+	cout << FluctuationRatio;
+	TDB_Free(pKLine);
+	return true;
+}
